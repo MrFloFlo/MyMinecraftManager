@@ -1,0 +1,26 @@
+{
+  "name": "mymmanager",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "express": "^5.1.0",
+    "express-basic-auth": "^1.2.1",
+    "express-session": "^1.18.1",
+    "formidable": "^3.5.4",
+    "fs-extra": "^11.3.0",
+    "multer": "^2.0.1",
+    "node-pty": "^1.0.0",
+    "pidusage": "^4.0.1",
+    "socket.io": "^4.8.1",
+    "ws": "^8.18.3",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0"
+  }
+}

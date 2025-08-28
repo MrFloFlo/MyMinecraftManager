@@ -1,0 +1,16 @@
+{
+  "Router": {
+    "name": "Router",
+    "workingDir": "/home/user/Desktop/test/MC Bungee",
+    "command": "java -Xms1G -Xmx2G -jar velocity-3.4.0-SNAPSHOT-515.jar",
+    "status": "stopped",
+    "pid": null
+  },
+  "Lobby": {
+    "name": "Lobby",
+    "workingDir": "/home/user/Desktop/test/MC lobby",
+    "command": "java -Xms1G -Xmx6G -jar paper-1.20.6-151.jar nogui",
+    "status": "stopped",
+    "pid": null
+  }
+}

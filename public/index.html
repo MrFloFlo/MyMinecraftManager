@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1" name="viewport" />
+    <title>Minecraft Manager</title>
+    <link
+        href="data:image/x-icon;base64,AAABAAEAEBAQAAEABADoAgAAFgAAACgAAAAQAAAAIAAAAAEABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+        rel="icon" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <style>
+        body {
+            background-color: #212529;
+            color: #f8f9fa;
+            margin: 0;
+        }
+
+        .instances-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .xterm-screen {
+            width: 100%;
+        }
+
+        .instance-list-container {
+            flex: 0 0 220px;
+            overflow-y: auto;
+            margin-left: 10px;
+        }
+
+        .instance-details {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: visible;
+            padding-right: 10px;
+        }
+
+        .btn-group button.btn {
+            width: 1.8rem;
+            height: 1.8rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+            margin-right: 0.5rem;
+        }
+
+        .btn-group button.btn:last-child {
+            margin-right: 0;
+        }
+
+        .btn-group button.btn-success {
+            background: url('./imgs/download.png') center center no-repeat;
+            background-size: contain;
+        }
+
+        .btn-group button.btn-primary {
+            background: url('./imgs/edit.png') center center no-repeat;
+            background-size: contain;
+        }
+
+        .btn-group button.btn-warning {
+            background: url('./imgs/rename.png') center center no-repeat;
+            background-size: contain;
+        }
+
+        .btn-group button.btn-danger {
+            background: url('./imgs/trash.png') center center no-repeat;
+            background-size: contain;
+        }
+
+        .terminal-output {
+            background: black;
+            color: lime;
+            padding: 1rem;
+            min-height: 700px;
+            max-height: 700px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.9rem;
+            white-space: pre-wrap;
+        }
+
+        #console-container {
+            width: 100%;
+            height: 700px;
+        }
+
+        .file-content {
+            background: #343a40;
+            color: #f8f9fa;
+            width: 100%;
+            height: 50vh;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+
+        @media (max-width: 768px) {
+            .instances-layout {
+                flex-direction: column;
+            }
+
+            .instance-list-container {
+                width: 100%;
+                margin-left: 0;
+                margin-bottom: 10px;
+            }
+
+            .instance-details {
+                padding-right: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Minecraft Manager</a>
+            <button aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"
+                class="navbar-toggler" data-bs-target="#navbarNav" data-bs-toggle="collapse" type="button">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" data-page="status" href="#">Server Status</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-page="instances" href="#">Instances</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-page="terminal" href="#">Terminal</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container-fluid mt-4">
+        <!-- Server Status Page -->
+        <div class="page" id="page-status" style="display: none;">
+            <h2>Server Status</h2>
+            <p id="system-usage">Loading...</p>
+            <table class="table table-dark table-striped">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Status</th>
+                        <th>CPU (%)</th>
+                        <th>Memory (MB)</th>
+                    </tr>
+                </thead>
+                <tbody id="status-instances-table"></tbody>
+            </table>
+        </div>
+        <!-- Instances Page -->
+        <div class="page" id="page-instances" style="display: none;">
+            <h2>Instances</h2>
+            <div class="instances-layout">
+                <div class="instance-list-container">
+                    <ul class="list-group" id="instance-list"></ul>
+                    <button class="btn btn-success mt-2 w-100" onclick="showNewInstanceModal()">New Instance</button>
+                </div>
+                <div class="instance-details" id="instance-details" style="display: none;">
+                    <h4 id="instance-name"></h4>
+                    <div class="mb-3" id="instance-controls"></div>
+                    <h5>Console Output</h5>
+                    <div id="console-container" style="width: 100%;"></div>
+                    <input autocomplete="off" class="form-control mt-2" id="console-input"
+                        onkeydown="sendCommand(event)" placeholder="Enter command..." type="text" />
+                    <div class="mt-3">
+                        <button class="btn btn-primary me-2"
+                            onclick="window.openInstanceFileManager(selectedInstance)">File Manager</button>
+                        <button class="btn btn-secondary" onclick="openInstanceSettings()">Instance Settings</button>
+                    </div>
+                    <div class="mt-4" id="file-manager-container"></div>
+                </div>
+            </div>
+        </div>
+        <!-- Terminal Page -->
+        <div class="page" id="page-terminal" style="display: none;">
+            <h2>Terminal</h2>
+            <div id="terminal-login">
+                <input class="form-control w-25 d-inline" id="terminal-password" placeholder="Enter password"
+                    type="password" />
+                <button class="btn btn-primary" onclick="authTerminal()">Login</button>
+            </div>
+            <div id="terminal-shell" style="display: none;">
+                <div class="terminal-output" id="terminal-output"></div>
+                <input autocomplete="off" class="form-control mt-2" id="terminal-input"
+                    onkeydown="sendTerminalCommand(event)" placeholder="Enter shell command..." type="text" />
+            </div>
+        </div>
+    </div>
+
+    <!-- New Instance Modal -->
+    <div class="modal fade" id="newInstanceModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title">New Instance</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Instance Name</label>
+                        <input class="form-control" id="new-name" placeholder="e.g. velocityServer" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Working Directory</label>
+                        <input class="form-control" id="new-dir" placeholder="/home/mc/velocity" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Runtime Command</label>
+                        <input class="form-control" id="new-cmd" placeholder="java -Xms1G -Xmx2G -jar velocity.jar" />
+                        <div class="form-text text-light">Enter full command line to run the server.</div>
+                    </div>
+                    <button class="btn btn-success" onclick="saveNewInstance()">Save Instance</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Instance Settings Modal -->
+    <div class="modal fade" id="instanceSettingsModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-scrollable modal-fullscreen-sm-down">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title">Instance Settings</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Instance Name</label>
+                        <input class="form-control" id="settings-name" placeholder="e.g. velocityServer" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Working Directory</label>
+                        <input class="form-control" id="settings-dir" placeholder="/home/mc/velocity" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Runtime Command</label>
+                        <input class="form-control" id="settings-cmd"
+                            placeholder="java -Xms1G -Xmx2G -jar velocity.jar" />
+                        <div class="form-text text-light">Enter the full command to run the server.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-success" onclick="saveInstanceSettings()">Save Changes</button>
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Manager Modal -->
+    <div class="modal fade" id="fileManagerModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title">File Manager</h5>
+                    <button class="btn-close btn-close-white" data-bs-dismiss="modal" type="button"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-flex justify-content-between mb-3">
+                        <input class="form-control me-2" id="fm-search" placeholder="Search files or folders..."
+                            type="text" />
+                        <button class="btn btn-secondary" id="fm-refresh-btn">Refresh</button>
+                    </div>
+                    <div class="mb-3">
+                        <input class="d-none" id="fm-upload-input" type="file">
+                        <button class="btn btn-success me-2" id="fm-new-file-btn">New File</button>
+                        <button class="btn btn-primary me-2" id="fm-new-folder-btn">New Folder</button>
+                        <button class="btn btn-warning" id="fm-upload-btn">Upload</button>
+                    </div>
+                    <p class="text-muted" id="fm-current-path"></p>
+                    <ul class="list-group" id="fm-list"></ul>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Editor Modal -->
+    <div class="modal fade" id="fileEditorModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-sm-down">
+            <div class="modal-content bg-dark text-light">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="fileEditorTitle">Editor</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="text" id="editorSearch" class="form-control mb-3" placeholder="Search in file..." />
+                    <textarea id="editorContent" class="form-control" rows="20"
+                        style="background: #1e1e1e; color: #f8f9fa; font-family: monospace; white-space: pre; resize: none;"></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-success" onclick="saveEditor()">Save</button>
+                    <button class="btn btn-secondary" onclick="closeEditor()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/filemanager.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.min.js"></script>
+
+
+    <script>
+
+        let selectedInstance = null;
+        let subscribedInstance = null;
+        let socketInstance = null;
+        let socketTerminal = null;
+        let currentFileManagerDir = '.';
+        let systemInterval = null;
+        const terminals = {};
+        const fitAddons = {};
+
+        const container = document.getElementById("console-container");
+
+        
+
+        function showNewInstanceModal() {
+            const modalEl = document.getElementById('newInstanceModal');
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        }
+
+        document.querySelectorAll(".nav-link").forEach(link => {
+            link.addEventListener("click", e => {
+                e.preventDefault();
+                const page = link.dataset.page;
+                if (page) showPage(page);
+            });
+        });
+
+        function escapeHtml(str) {
+            return str?.replace(/[&<>"']/g, m => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;"
+            }[m])) || "";
+        }
+
+        function showPage(page) {
+            document.querySelectorAll(".page").forEach(p => p.style.display = "none");
+            document.getElementById(`page-${page}`).style.display = "block";
+
+            document.querySelectorAll(".nav-link").forEach(n => n.classList.remove("active"));
+            document.querySelector(`.nav-link[data-page='${page}']`)?.classList.add("active");
+
+            clearInterval(systemInterval);
+
+            if (page === "status") {
+                loadSystemStatus();
+                systemInterval = setInterval(loadSystemStatus, 2000);
+            } else if (page === "instances") {
+                loadInstances();
+            }
+        }
+
+        function loadSystemStatus() {
+            socketInstance.emit("getSystemInfo");
+            socketInstance.emit("getInstancesStatus");
+        }
+
+        function renderInstancesTable(instances) {
+            let rows = '';
+            for (const name in instances) {
+                const inst = instances[name];
+                rows += `<tr>
+            <td>${escapeHtml(name)}</td>
+            <td>${escapeHtml(inst.status)}</td>
+            <td>${inst.cpu !== undefined ? inst.cpu.toFixed(1) : "-"}</td>
+            <td>${inst.memory !== undefined ? inst.memory.toFixed(1) : "-"}</td>
+        </tr>`;
+            }
+            document.getElementById("status-instances-table").innerHTML = rows;
+        }
+
+        function renderInstancesList(instances) {
+            const list = document.getElementById("instance-list");
+            list.innerHTML = '';
+            for (const name in instances) {
+                const inst = instances[name];
+                const li = document.createElement('li');
+                li.className = "list-group-item list-group-item-dark";
+                li.textContent = `${name} (${inst.status})`;
+                li.onclick = () => selectInstance(name);
+                if (name === selectedInstance) li.classList.add("active");
+                list.appendChild(li);
+            }
+            if (selectedInstance) {
+                selectInstance(selectedInstance);
+            } else {
+                document.getElementById("instance-details").style.display = "none";
+            }
+        }
+
+        function loadInstances() {
+
+            socketInstance.emit("getInstancesList");
+
+        }
+
+        async function selectInstance(name) {
+            selectedInstance = name; // Set selected instance
+            document.getElementById('console-input').value = ''
+            if (subscribedInstance) {
+                socketInstance.emit("unsubscribe", { instance: subscribedInstance });
+            }
+            subscribedInstance = name;
+
+            document.getElementById("instance-details").style.display = "block";
+            document.getElementById("instance-name").innerText = name;
+
+            document.querySelectorAll("#instance-list .list-group-item").forEach(el => {
+                el.classList.toggle("active", el.textContent.startsWith(name));
+            });
+
+            document.getElementById("instance-controls").innerHTML = `
+        <button class="btn btn-success me-2" onclick="startInstance()">Start</button>
+        <button class="btn btn-danger me-2" onclick="stopInstance()">Stop</button>
+        <button class="btn btn-warning me-2" onclick="restartInstance()">Restart</button>
+        <button class="btn btn-outline-danger me-2" onclick="terminateInstance()">Terminate</button>
+    `;
+
+            socketInstance.emit("subscribe", { instance: name });
+            socketInstance.emit("getInstanceLogs", { instance: name });
+            socketInstance.emit("setActiveInstance", { instance: name });
+
+            // Clear previous console output container
+            container.innerHTML = "";
+
+            if (!terminals[name]) {
+                const term = new Terminal({
+                    theme: {
+                        background: '#000000',
+                        foreground: '#00FF00',
+                    },
+                    fontFamily: 'monospace',
+                    fontSize: 14,
+                    cursorBlink: true,
+                    rows: 24,
+                });
+
+                const fitAddon = new FitAddon.FitAddon();
+                term.loadAddon(fitAddon);
+
+                term.open(container);
+                fitAddon.fit();
+
+                terminals[name] = term;
+                fitAddons[name] = fitAddon;
+
+                term.writeln(`Welcome to Minecraft Manager Terminal for instance: ${name}!`);
+
+                // Delay fit slightly to ensure correct dimensions
+                setTimeout(() => {
+                    fitAddons[name].fit();
+                }, 10);
+            } else {
+                terminals[name].open(container);
+                fitAddons[name].fit();
+            }
+        }
+
+        function startInstance() {
+            if (!selectedInstance) return alert("Select an instance first.");
+            socketInstance.emit("instanceAction", {
+                action: "start",
+                instance: selectedInstance
+            });
+        }
+
+        function stopInstance() {
+            if (!selectedInstance) return alert("Select an instance first.");
+            socketInstance.emit("instanceAction", {
+                action: "stop",
+                instance: selectedInstance
+            });
+        }
+
+        function restartInstance() {
+            if (!selectedInstance) return alert("Select an instance first.");
+            socketInstance.emit("instanceAction", {
+                action: "restart",
+                instance: selectedInstance
+            });
+        }
+
+        function terminateInstance() {
+            if (!selectedInstance) return alert("Select an instance first.");
+            socketInstance.emit("instanceAction", {
+                action: "terminate",
+                instance: selectedInstance
+            });
+        }
+
+        function loadLogsForSelectedInstance() {
+            if (!selectedInstance) return;
+            socketInstance.emit("getInstanceLogs", { instance: selectedInstance });
+        }
+
+        function sendCommand(e) {
+            if (e.key === "Enter") {
+                const cmd = e.target.value.trim();
+                if (!cmd) return;
+                socketInstance.emit("instanceCommand", {
+                    instance: selectedInstance,
+                    command: cmd
+                });
+                e.target.value = "";
+            }
+        }
+
+        function openInstanceSettings() {
+            if (!selectedInstance) {
+                alert("Select an instance first.");
+                return;
+            }
+
+            // Fetch current instance data
+            socketInstance.emit("getInstanceSettings", { instance: selectedInstance });
+        }
+
+        function authTerminal() {
+            const pw = document.getElementById("terminal-password").value;
+            if (pw !== "secret") {
+                alert("Wrong password!");
+                return;
+            }
+            document.getElementById("terminal-login").style.display = "none";
+            document.getElementById("terminal-shell").style.display = "block";
+
+            socketTerminal = io();
+
+            socketTerminal.emit("subscribeTerminal");
+
+            socketTerminal.on("terminalOutput", (data) => {
+                const out = document.getElementById("terminal-output");
+                out.textContent += data.text;
+                if (out.textContent.length > 50000) {
+                    out.textContent = out.textContent.slice(-50000);
+                }
+                out.scrollTop = out.scrollHeight;
+            });
+        }
+
+        function sendTerminalCommand(e) {
+            if (e.key === "Enter") {
+                const cmd = e.target.value.trim();
+                if (!cmd) return;
+                socketTerminal.emit("terminalInput", { command: cmd });
+                e.target.value = "";
+            }
+        }
+
+        function saveNewInstance() {
+            const name = document.getElementById('new-name').value.trim();
+            const dir = document.getElementById('new-dir').value.trim();
+            const cmd = document.getElementById('new-cmd').value.trim();
+            if (!name || !dir || !cmd) {
+                return alert("Please fill all fields.");
+            }
+            socketInstance.emit("createInstance", {
+                name,
+                workingDir: dir,
+                command: cmd
+            });
+            bootstrap.Modal.getInstance(document.getElementById('newInstanceModal')).hide();
+            loadInstances();
+        }
+
+        function saveInstanceSettings() {
+            const name = document.getElementById('settings-name').value.trim();
+            const dir = document.getElementById('settings-dir').value.trim();
+            const cmd = document.getElementById('settings-cmd').value.trim();
+
+            if (!name || !dir || !cmd) {
+                return alert("Please fill all fields.");
+            }
+
+            socketInstance.emit("updateInstanceSettings", {
+                originalName: selectedInstance,
+                name,
+                workingDir: dir,
+                command: cmd
+            });
+
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('instanceSettingsModal')).hide();
+
+            loadInstances();
+        }
+
+        function setupMainSocket() {
+            if (socketInstance) return; // already initialized
+
+            socketInstance = io();
+
+            socketInstance.on("log", (data) => {
+                if (!data.instance) return;
+                const term = terminals[data.instance];
+                if (term) {
+                    term.writeln(data.text);
+                } else {
+                    console.warn("No terminal found for instance:", data.instance);
+                }
+            });
+
+
+            socketInstance.on("statusUpdate", (data) => {
+                if (data.status === 'stopped' && data.instance === selectedInstance) {
+                    loadInstances();
+                }
+            });
+
+            socketInstance.on("systemInfo", (data) => {
+                document.getElementById("system-usage").innerText =
+                    `CPU: ${data.cpu.toFixed(1)}% | Memory: ${data.memoryUsedMB.toFixed(1)} MB / ${data.memoryTotalMB.toFixed(1)} MB`;
+            });
+
+            socketInstance.on("instancesList", (instances) => {
+                renderInstancesList(instances);
+            });
+
+            socketInstance.on("instancesStatus", (instances) => {
+                renderInstancesTable(instances);
+            });
+
+
+
+            socketInstance.on("actionResponse", (data) => {
+                if (data.success) {
+                    console.log(`${data.action} successful`);
+                    loadLogsForSelectedInstance();
+                    loadInstances();
+                } else {
+                    alert(`Error: ${data.message}`);
+                }
+            });
+
+            socketInstance.on("instanceSettings", (data) => {
+                if (!data || !data.instance) {
+                    alert("Failed to load instance settings.");
+                    return;
+                }
+
+                // If name is missing, add selectedInstance as the name
+                const inst = data.instance;
+                if (!inst.name) {
+                    inst.name = selectedInstance;
+                }
+
+                document.getElementById("settings-name").value = inst.name || "";
+                document.getElementById("settings-dir").value = inst.workingDir || "";
+                document.getElementById("settings-cmd").value = inst.command || "";
+
+                const modalEl = document.getElementById("instanceSettingsModal");
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                modal.show();
+            });
+
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            fitAddon = new window.FitAddon.FitAddon();
+
+            term = new window.Terminal({
+                theme: {
+                    background: '#000000',
+                    foreground: '#00FF00',
+                },
+                fontFamily: 'monospace',
+                fontSize: 14,
+                cursorBlink: true,
+                rows: 24,
+            });
+
+            term.loadAddon(fitAddon);
+
+            setupMainSocket();
+            showPage("status");
+        });
+
+        window.addEventListener('resize', () => {
+            if (selectedInstance && fitAddons[selectedInstance]) {
+                fitAddons[selectedInstance].fit();
+            }
+        });
+
+
+    </script>
+
+</body>
+
+</html>
